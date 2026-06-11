@@ -43,7 +43,7 @@ def run_training():
         warmup_steps=100,
         max_steps=2000,
         fp16=True,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         per_device_eval_batch_size=4,
         eval_steps=250,
         save_steps=250,
