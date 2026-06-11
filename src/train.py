@@ -48,7 +48,7 @@ def run_training():
         eval_steps=250,
         save_steps=250,
         logging_steps=50,
-        label_names=["labels"],
+        
     )
 
     trainer = Seq2SeqTrainer(
