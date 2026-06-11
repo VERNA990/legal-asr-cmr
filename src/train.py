@@ -48,7 +48,6 @@ def run_training():
         eval_steps=250,
         save_steps=250,
         logging_steps=50,
-        remove_unused_columns=False,
         label_names=["labels"],
     )
 
