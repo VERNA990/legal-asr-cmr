@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/
+.huggingface/
+huggingface_cache/
+whisper-medium-checkpoints/
+final_finetuned_whisper/

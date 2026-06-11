@@ -1,0 +1,8 @@
+transformers
+datasets
+soundfile
+librosa
+peft
+evaluate
+jiwer
+accelerate
