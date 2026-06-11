@@ -1,4 +1,5 @@
 import os
+import glob
 import pandas as pd
 from datasets import Dataset, Audio, DatasetDict
 from transformers import WhisperProcessor
@@ -12,27 +13,36 @@ def load_and_transform_gated_data():
         
     df = pd.read_csv(csv_path)
     
+    print("🔍 Indexing actual physical files on disk for rapid mapping...")
+    # Scan every single .wav file currently sitting in your extracted directories
+    actual_wav_paths = glob.glob("/content/afrispeech/**/*.wav", recursive=True)
+    
+    # Create a lookup dictionary: { 'filename.wav': '/absolute/path/to/filename.wav' }
+    disk_lookup = {os.path.basename(p): p for p in actual_wav_paths}
+    print(f"📁 Indexed {len(disk_lookup)} physical audio tracks on runtime storage.")
+    
     valid_paths = []
     valid_transcripts = []
     
-    print("🛠️ Synchronizing tracking records with active disk pathways...")
+    print("🛠️ Re-anchoring CSV records to physical disk paths...")
+    missing_counter = 0
+    
     for idx, row in df.iterrows():
-        path = row['audio_path']
+        csv_path_entry = row['audio_path']
         transcript = row['transcript']
         
-        # If the dataset was generated under a different subfolder pattern, adjust path layout
-        if not os.path.exists(path):
-            # Fallback path lookup swapping out root prefixes if needed
-            base_filename = os.path.basename(path)
-            # Search under your locally extracted content path
-            alternative_path = os.path.join("/content/afrispeech", base_filename)
+        # Extract just the filename (e.g., 'xyz.wav') from the long CSV path string
+        filename = os.path.basename(csv_path_entry)
+        
+        # Check if that filename exists anywhere in our scanned disk lookup
+        if filename in disk_lookup:
+            path = disk_lookup[filename]
+        elif os.path.exists(csv_path_entry):
+            path = csv_path_entry
+        else:
+            missing_counter += 1
+            continue  # Skip if the file physically isn't there
             
-            if os.path.exists(alternative_path):
-                path = alternative_path
-            else:
-                # Fallback to search recursively for this audio item name
-                continue 
-                
         if pd.isna(transcript) or not str(transcript).strip():
             continue
             
@@ -40,6 +50,8 @@ def load_and_transform_gated_data():
         valid_transcripts.append(str(transcript))
         
     print(f"🎵 Successfully verified and anchored {len(valid_paths)} audio channels for runtime execution.")
+    if missing_counter > 0:
+        print(f"⚠️ Skipped {missing_counter} rows because their filenames weren't found in /content/afrispeech.")
     
     if not valid_paths:
         raise ValueError("❌ Error: Zero active physical file matches found on disk using CSV mappings.")
