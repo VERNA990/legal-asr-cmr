@@ -1,67 +1,57 @@
 import os
-import glob
-from datasets import load_dataset, Dataset, Audio, DatasetDict
+import pandas as pd
+from datasets import Dataset, Audio, DatasetDict
 from transformers import WhisperProcessor
 
 def load_and_transform_gated_data():
-    print("📥 Loading open-source text metadata columns for 'intronhealth/afrispeech-200'...")
+    csv_path = "/content/drive/MyDrive/fyp-phase0/phase0_dataset.csv"
+    print(f"📊 Loading target evaluation data matrix from: {csv_path}")
     
-    # We load ONLY the text metadata references by dropping the heavy audio decoding paths
-    try:
-        hf_metadata = load_dataset(
-            "intronhealth/afrispeech-200", 
-            split="train",
-            trust_remote_code=False # Forces HF to bypass the broken .py script entirely
-        )
-    except Exception as e:
-        print("Falling back to streaming metadata configuration...")
-        hf_metadata = load_dataset("intronhealth/afrispeech-200", split="train", streaming=True)
-
-    print("🔑 Creating text mapping index lookups...")
-    text_lookup = {}
-    
-    # Extract entries to map file basenames to true text strings
-    if hasattr(hf_metadata, "take"): # Handle streaming object types gracefully
-        metadata_samples = list(hf_metadata.take(1000))
-        for sample in metadata_samples:
-            path_key = os.path.basename(sample.get("audio_id", "")) + ".wav"
-            text_lookup[path_key] = sample.get("transcript", "")
-    else: # Handle standard dataset dictionary mappings
-        for sample in hf_metadata:
-            path_key = os.path.basename(sample.get("audio_id", sample.get("path", ""))) + ".wav"
-            text_lookup[path_key] = sample.get("transcript", "")
-
-    print("📥 Scanning local audio pathways in /content/afrispeech...")
-    audio_paths = glob.glob("/content/afrispeech/**/*.wav", recursive=True)
-    if not audio_paths:
-        audio_paths = glob.glob("/content/afrispeech/*.wav")
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"❌ Missing critical database mapping index: {csv_path}")
         
-    print(f"🎵 Found {len(audio_paths)} local audio tracks on disk.")
+    df = pd.read_csv(csv_path)
     
-    valid_audios = []
-    real_transcripts = []
+    valid_paths = []
+    valid_transcripts = []
     
-    # Pair local audio files with their actual text transcripts
-    for path in audio_paths:
-        file_name = os.path.basename(path)
-        if file_name in text_lookup and text_lookup[file_name].strip():
-            valid_audios.append(path)
-            real_transcripts.append(text_lookup[file_name])
-        else:
-            # Fallback text assignment for any unmatched files so evaluation doesn't fail
-            valid_audios.append(path)
-            real_transcripts.append("the speaker is recording a localized west african dialect sentence.")
-
-    print(f"🔗 Successfully matched {len(valid_audios)} tracks with true textual references.")
+    print("🛠️ Synchronizing tracking records with active disk pathways...")
+    for idx, row in df.iterrows():
+        path = row['audio_path']
+        transcript = row['transcript']
+        
+        # If the dataset was generated under a different subfolder pattern, adjust path layout
+        if not os.path.exists(path):
+            # Fallback path lookup swapping out root prefixes if needed
+            base_filename = os.path.basename(path)
+            # Search under your locally extracted content path
+            alternative_path = os.path.join("/content/afrispeech", base_filename)
+            
+            if os.path.exists(alternative_path):
+                path = alternative_path
+            else:
+                # Fallback to search recursively for this audio item name
+                continue 
+                
+        if pd.isna(transcript) or not str(transcript).strip():
+            continue
+            
+        valid_paths.append(path)
+        valid_transcripts.append(str(transcript))
+        
+    print(f"🎵 Successfully verified and anchored {len(valid_paths)} audio channels for runtime execution.")
+    
+    if not valid_paths:
+        raise ValueError("❌ Error: Zero active physical file matches found on disk using CSV mappings.")
 
     data_manifest = {
-        "audio": valid_audios,
-        "transcript": real_transcripts
+        "audio": valid_paths,
+        "transcript": valid_transcripts
     }
     
     raw_dataset = Dataset.from_dict(data_manifest)
     
-    print("✂️ Engineering 70/15/15 train-validation-test structural allocations...")
+    print("✂️ Engineering train/validation/test evaluation boundaries (70/15/15)...")
     train_testval = raw_dataset.train_test_split(test_size=0.3, seed=42)
     test_val = train_testval["test"].train_test_split(test_size=0.5, seed=42)
     
@@ -71,7 +61,7 @@ def load_and_transform_gated_data():
         "test": test_val["test"]
     })
     
-    print("🔄 Forcing pipeline audio casting (16,000Hz Mono)...")
+    print("🔄 Casting structural features to target pipeline audio formats (16kHz Mono)...")
     dataset_splits = dataset_splits.cast_column("audio", Audio(sampling_rate=16000))
     
     processor = WhisperProcessor.from_pretrained("openai/whisper-medium", language="English", task="transcribe")
@@ -86,12 +76,12 @@ def load_and_transform_gated_data():
         batch["labels"] = processor.tokenizer(batch["transcript"]).input_ids
         return batch
 
-    print("⚡ Mapping transformations across local structural matrices...")
+    print("⚡ Mapping Whisper feature tokenizations across matrix splits...")
     processed_dataset = dataset_splits.map(
         transform_function, 
         remove_columns=["audio", "transcript"], 
-        num_proc=2
+        num_proc=1
     )
     
-    print("✅ Local alignment data components constructed successfully!")
+    print("✅ Local alignment data components finalized successfully!")
     return processed_dataset, processor
