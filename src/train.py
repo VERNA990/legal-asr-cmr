@@ -58,7 +58,7 @@ def run_training():
         train_dataset=processed_dataset["train"],
         eval_dataset=processed_dataset["validation"],
         data_collator=data_collator,
-        tokenizer=processor.feature_extractor,
+        processing_class=processor.feature_extractor,
     )
 
     print("🔥 Starting Supervised Fine-Tuning Loop...")
